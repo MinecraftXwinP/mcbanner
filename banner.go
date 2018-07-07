@@ -3,15 +3,21 @@ package mcbanner
 import (
 	"fmt"
 	"image"
-	"image/color"
 	"image/draw"
 	"image/png"
 	"io/ioutil"
 	"os"
 
-	"github.com/golang/freetype"
+	"golang.org/x/image/math/fixed"
+
 	"github.com/golang/freetype/truetype"
 	"github.com/google/uuid"
+	"golang.org/x/image/font"
+)
+
+const (
+	DefaultWidth  = 336
+	DefaultHeight = 280
 )
 
 type PlayerList struct {
@@ -42,7 +48,7 @@ func loadBackground() (draw.Image, error) {
 	return v, nil
 }
 
-func loadFontConctext() (*freetype.Context, error) {
+func loadFontFace() (font.Face, error) {
 	fontSrc, err := os.Open("NotoMono-Regular.ttf")
 	if err != nil {
 		return nil, err
@@ -51,13 +57,15 @@ func loadFontConctext() (*freetype.Context, error) {
 	if err != nil {
 		return nil, err
 	}
-	font, err := truetype.Parse(data)
+	f, err := truetype.Parse(data)
 	if err != nil {
 		return nil, err
 	}
-	c := freetype.NewContext()
-	c.SetFont(font)
-	return c, nil
+	return truetype.NewFace(f, &truetype.Options{
+		Size:    12,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	}), nil
 }
 
 func GetDefault(status ServerStatus) (image.Image, error) {
@@ -65,15 +73,24 @@ func GetDefault(status ServerStatus) (image.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	fontC, err := loadFontConctext()
+	f, err := loadFontFace()
 	if err != nil {
 		return nil, err
 	}
-	// draw address
-	fontC.SetDst(background)
-	fontC.SetSrc(image.NewUniform(color.RGBA{200, 100, 0, 255}))
-	pt := freetype.Pt(20, 20+int(fontC.PointToFixed(14)>>6))
-	fontC.DrawString(status.Host, pt)
+	// draw adress
+	d := &font.Drawer{
+		Dst:  background,
+		Src:  image.White,
+		Face: f,
+	}
+	rect := background.Bounds()
+	width := rect.Dx()
+	height := rect.Dy()
+	d.Dot = fixed.Point26_6{
+		X: fixed.I(width / 15),
+		Y: fixed.I(height / 15),
+	}
+	d.DrawString(fmt.Sprintf("伺服器:%s:%d", status.Host, status.Port))
 
 	return background, nil
 }
