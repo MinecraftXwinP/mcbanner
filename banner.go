@@ -1,8 +1,10 @@
 package mcbanner
 
 import (
+	"fmt"
 	"image"
 	"image/draw"
+	"math"
 	"strconv"
 
 	"golang.org/x/image/font/inconsolata"
@@ -27,6 +29,19 @@ type ServerStatus struct {
 	Host       string
 	Port       int
 	PlayerList PlayerList
+}
+
+// GetAddress returns server address. If the port is default minecraft server port, 25565, the tcp port will not be shown.
+func (status *ServerStatus) GetAddress() string {
+	addr := status.Host
+	if status.Port != 25565 {
+		addr += ":" + strconv.Itoa(status.Port)
+	}
+	return addr
+}
+
+func (status *ServerStatus) GetPlayerCount() string {
+	return fmt.Sprintf("%d / %d", len(status.PlayerList.Players), status.PlayerList.Max)
 }
 
 // GetDefault returns default banner. White background and with default size 336 x 280
@@ -60,15 +75,52 @@ func (b *Banner) Render() image.Image {
 	rect := b.Background.Bounds()
 	width := rect.Dx()
 	height := rect.Dy()
+	dx, dy := fixed.I(width/12), fixed.I(height/12)
 	d.Dot = fixed.Point26_6{
-		X: fixed.I(width / 15),
-		Y: fixed.I(height / 15),
+		X: dx,
+		Y: dy,
 	}
-	addr := b.ServerStatus.Host
-	if b.ServerStatus.Port != 25565 {
-		addr += strconv.Itoa(b.ServerStatus.Port)
+
+	d.DrawString(b.ServerStatus.GetAddress())
+
+	countStr := b.ServerStatus.GetPlayerCount()
+
+	// render player count
+	d.Dot = fixed.Point26_6{
+		X: dx*11 - d.MeasureString(countStr),
+		Y: dy,
 	}
-	d.DrawString(addr)
+
+	d.DrawString(countStr)
 
 	return img
+}
+
+const (
+	horizontal = iota
+	vertical
+)
+
+type nameListLayout struct {
+	Size     fixed.Point26_6
+	CellSize fixed.Point26_6
+}
+
+func (n nameListLayout) getLayout(itemCount int) (int, int) {
+	if n.getOrientation() == vertical {
+		// vertical, try allocate more rows.
+		row := int(n.Size.Y / n.CellSize.Y)
+		column := int(math.Ceil(float64(itemCount) / float64(row)))
+		return row, column
+	}
+	column := int(n.Size.X / n.CellSize.X)
+	row := int(math.Ceil(float64(itemCount) / float64(column)))
+	return row, column
+}
+
+func (n nameListLayout) getOrientation() int {
+	if n.Size.X > n.Size.Y {
+		return horizontal
+	}
+	return vertical
 }
