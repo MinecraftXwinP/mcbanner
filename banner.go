@@ -130,7 +130,7 @@ func (b *Banner) Render() image.Image {
 	for c := 0; c < column; c++ {
 		x := dx + layout.CellSize.X.Mul(fixed.I(c))
 		for r := 0; r < row; r++ {
-			if p >= playerCount-1 {
+			if p >= playerCount {
 				break
 			}
 			d.Dot = fixed.Point26_6{
