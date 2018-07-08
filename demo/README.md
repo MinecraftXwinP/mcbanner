@@ -2,4 +2,4 @@
 
 ## Usage
 
-`go run main.go [host] <port>`
+`go run main.go -server=[host]`

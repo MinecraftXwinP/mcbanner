@@ -7,8 +7,9 @@ import (
 	"math"
 	"strconv"
 
+	"github.com/fogleman/gg"
+
 	"golang.org/x/image/font/inconsolata"
-	"golang.org/x/image/math/fixed"
 
 	"github.com/google/uuid"
 	"golang.org/x/image/font"
@@ -30,13 +31,13 @@ type PlayerList struct {
 	Min     int
 }
 type StringSizeMeasurer interface {
-	MeasureString(s string) (advanced fixed.Int26_6)
+	MeasureString(s string) (w, h float64)
 }
 
-func (list PlayerList) GetNameWidth(d StringSizeMeasurer) fixed.Int26_6 {
-	max := fixed.I(1)
+func (list PlayerList) GetNameWidth(d StringSizeMeasurer) float64 {
+	max := float64(1)
 	for _, p := range list.Players {
-		w := d.MeasureString(p.Name)
+		w, _ := d.MeasureString(p.Name)
 		if w > max {
 			max = w
 		}
@@ -82,44 +83,26 @@ type Banner struct {
 }
 
 func (b *Banner) Render() image.Image {
-	img := image.NewRGBA64(b.Background.Bounds())
-	// draw background
-	draw.Draw(img, b.Background.Bounds(), b.Background, image.ZP, draw.Src)
-	// draw adress
-	d := &font.Drawer{
-		Dst:  img,
-		Src:  image.Black,
-		Face: b.FontFace,
-	}
-	rect := b.Background.Bounds()
-	width := rect.Dx()
-	height := rect.Dy()
-	dx, dy := fixed.I(width/12), fixed.I(height/12)
-	d.Dot = fixed.Point26_6{
-		X: dx,
-		Y: dy,
-	}
+	bounds := b.Background.Bounds()
+	width := bounds.Dx()
+	height := bounds.Dy()
+	c := gg.NewContextForImage(b.Background)
+	c.DrawImage(b.Background, 0, 0)
+	c.SetRGB255(0, 0, 0)
+	c.SetFontFace(b.FontFace)
+	c.DrawStringAnchored(b.ServerStatus.GetAddress(), float64(0), float64(0), 0, 1)
+	c.DrawStringAnchored(b.ServerStatus.GetPlayerCount(), float64(width), float64(0), 1, 1)
 
-	d.DrawString(b.ServerStatus.GetAddress())
+	_, textHeight := c.MeasureString("A")
 
-	countStr := b.ServerStatus.GetPlayerCount()
-
-	// render player count
-	d.Dot = fixed.Point26_6{
-		X: dx*11 - d.MeasureString(countStr),
-		Y: dy,
-	}
-	d.DrawString(countStr)
-
-	// render player names
 	layout := nameListLayout{
-		Size: fixed.Point26_6{
-			X: dx * 9,
-			Y: dy * 9,
+		Size: Size{
+			float64(width),
+			float64(height * 2 / 3),
 		},
-		CellSize: fixed.Point26_6{
-			X: b.ServerStatus.PlayerList.GetNameWidth(d),
-			Y: d.Face.Metrics().Height,
+		CellSize: Size{
+			b.ServerStatus.PlayerList.GetNameWidth(c) + 30,
+			textHeight,
 		},
 	}
 
@@ -127,22 +110,19 @@ func (b *Banner) Render() image.Image {
 	row, column := layout.getLayout(playerCount)
 
 	p := 0
-	for c := 0; c < column; c++ {
-		x := dx + layout.CellSize.X.Mul(fixed.I(c))
+	for col := 0; col < column; col++ {
+		x := layout.CellSize.Width * float64(col)
 		for r := 0; r < row; r++ {
 			if p >= playerCount {
 				break
 			}
-			d.Dot = fixed.Point26_6{
-				X: x,
-				Y: dy.Mul(fixed.I(r + 2)),
-			}
-			d.DrawString(b.ServerStatus.PlayerList.Players[p].Name)
+			// d.DrawString(b.ServerStatus.PlayerList.Players[p].Name)
+			c.DrawStringAnchored(b.ServerStatus.PlayerList.Players[p].Name, x, float64(r)*layout.CellSize.Height+(float64(height)/3), 0, 1)
 			p++
 		}
 	}
 
-	return img
+	return c.Image()
 }
 
 const (
@@ -150,25 +130,30 @@ const (
 	vertical
 )
 
+type Size struct {
+	Width  float64
+	Height float64
+}
+
 type nameListLayout struct {
-	Size     fixed.Point26_6
-	CellSize fixed.Point26_6
+	Size     Size
+	CellSize Size
 }
 
 func (n nameListLayout) getLayout(itemCount int) (int, int) {
 	if n.getOrientation() == vertical {
 		// vertical, try allocate more rows.
-		row := int(n.Size.Y / n.CellSize.Y)
-		column := int(math.Ceil(float64(itemCount) / float64(row)))
-		return row, column
+		row := math.Floor(n.Size.Height / n.CellSize.Height)
+		column := math.Ceil(float64(itemCount) / row)
+		return int(row), int(column)
 	}
-	column := int(n.Size.X / n.CellSize.X)
-	row := int(math.Ceil(float64(itemCount) / float64(column)))
-	return row, column
+	column := math.Floor(n.Size.Width / n.CellSize.Width)
+	row := math.Ceil(float64(itemCount) / column)
+	return int(row), int(column)
 }
 
 func (n nameListLayout) getOrientation() int {
-	if n.Size.X > n.Size.Y {
+	if n.Size.Width > n.Size.Height {
 		return horizontal
 	}
 	return vertical

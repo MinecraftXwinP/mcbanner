@@ -1,12 +1,16 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"image"
 	"image/png"
 	"log"
 	"net"
 	"os"
 	"strconv"
+
+	"golang.org/x/image/font/inconsolata"
 
 	"github.com/google/uuid"
 
@@ -17,26 +21,21 @@ import (
 
 var host string
 var port int
+var backgroundPath string
 
 func init() {
-	argc := len(os.Args)
-	if argc < 2 {
-		fmt.Println("Usage: demo [server address] [port]")
-		os.Exit(-1)
-	}
-	host = os.Args[1]
-	var err error
-	if argc > 2 {
-		port, err = strconv.Atoi(os.Args[2])
-		if err != nil {
-			log.Fatal("invalid port", err)
-		}
-	} else {
-		port = 25565
-	}
+	flag.StringVar(&host, "server", "", "minecraft server address")
+	flag.StringVar(&backgroundPath, "bkg", "", "custom background image. format should be PNG.")
+	flag.IntVar(&port, "port", 25565, "server port.")
+	flag.Parse()
 }
 
 func main() {
+	if len(host) <= 0 {
+		fmt.Printf("host: %s. port: %d. bkg: %s", host, port, backgroundPath)
+		flag.Usage()
+		os.Exit(-1)
+	}
 	addr := host + ":" + strconv.Itoa(port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -57,15 +56,31 @@ func main() {
 			UUID: id,
 		}
 	}
-
-	img := mcbanner.GetDefault(mcbanner.ServerStatus{
+	status := mcbanner.ServerStatus{
 		Host: host,
 		Port: port,
 		PlayerList: mcbanner.PlayerList{
 			Max:     pong.Players.Max,
 			Players: players,
 		},
-	})
+	}
+	var img image.Image
+	if len(backgroundPath) <= 0 {
+		img = mcbanner.GetDefault(status)
+	} else {
+		bkFile, err := os.Open(backgroundPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer bkFile.Close()
+		b, err := png.Decode(bkFile)
+		r := mcbanner.Banner{
+			Background:   b,
+			FontFace:     inconsolata.Bold8x16,
+			ServerStatus: status,
+		}
+		img = r.Render()
+	}
 	out, err := os.Create("./out.png")
 	if err != nil {
 		log.Fatal(err)
