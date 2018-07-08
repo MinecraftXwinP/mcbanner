@@ -19,10 +19,29 @@ const (
 	DefaultHeight = 280
 )
 
+type Player struct {
+	Name string
+	UUID uuid.UUID
+}
+
 type PlayerList struct {
-	Players []uuid.UUID
+	Players []Player
 	Max     int
 	Min     int
+}
+type StringSizeMeasurer interface {
+	MeasureString(s string) (advanced fixed.Int26_6)
+}
+
+func (list PlayerList) GetNameWidth(d StringSizeMeasurer) fixed.Int26_6 {
+	max := fixed.I(1)
+	for _, p := range list.Players {
+		w := d.MeasureString(p.Name)
+		if w > max {
+			max = w
+		}
+	}
+	return max
 }
 
 type ServerStatus struct {
@@ -90,8 +109,38 @@ func (b *Banner) Render() image.Image {
 		X: dx*11 - d.MeasureString(countStr),
 		Y: dy,
 	}
-
 	d.DrawString(countStr)
+
+	// render player names
+	layout := nameListLayout{
+		Size: fixed.Point26_6{
+			X: dx * 9,
+			Y: dy * 9,
+		},
+		CellSize: fixed.Point26_6{
+			X: b.ServerStatus.PlayerList.GetNameWidth(d),
+			Y: d.Face.Metrics().Height,
+		},
+	}
+
+	playerCount := len(b.ServerStatus.PlayerList.Players)
+	row, column := layout.getLayout(playerCount)
+
+	p := 0
+	for c := 0; c < column; c++ {
+		x := dx + layout.CellSize.X.Mul(fixed.I(c))
+		for r := 0; r < row; r++ {
+			if p >= playerCount-1 {
+				break
+			}
+			d.Dot = fixed.Point26_6{
+				X: x,
+				Y: dy.Mul(fixed.I(r + 2)),
+			}
+			d.DrawString(b.ServerStatus.PlayerList.Players[p].Name)
+			p++
+		}
+	}
 
 	return img
 }

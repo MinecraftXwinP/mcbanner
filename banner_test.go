@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/image/math/fixed"
 )
@@ -77,4 +78,48 @@ func ExampleGetAddress() {
 	// Output:
 	// example.com
 	// example.com:25566
+}
+
+// font.Drawer Mock
+type fontDrawerMock struct {
+}
+
+func (fd *fontDrawerMock) MeasureString(s string) fixed.Int26_6 {
+	return fixed.I(len(s))
+}
+
+func TestGetNameWidth(t *testing.T) {
+	fakePlayers := make([]Player, 20)
+	for i := 0; i < 19; i++ {
+		fakePlayers[i] = Player{
+			Name: fmt.Sprintf("Player%d", i),
+			UUID: uuid.New(),
+		}
+	}
+	longName := "longest player name    "
+	fakePlayers[19] = Player{
+		Name: longName,
+		UUID: uuid.New(),
+	}
+	list := PlayerList{
+		Max:     20,
+		Players: fakePlayers,
+	}
+	assert.Equal(t, fixed.I(len(longName)), list.GetNameWidth(&fontDrawerMock{}))
+}
+
+func TestGetNameWidthWillNotReturnZero(t *testing.T) {
+	namelessPlayers := make([]Player, 20)
+	for i := 0; i < 20; i++ {
+		namelessPlayers[i] = Player{
+			Name: "",
+			UUID: uuid.New(),
+		}
+	}
+	list := PlayerList{
+		Max:     20,
+		Players: namelessPlayers,
+	}
+
+	assert.Equal(t, fixed.I(1), list.GetNameWidth(&fontDrawerMock{}))
 }
