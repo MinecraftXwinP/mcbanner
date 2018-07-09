@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"image"
 	"image/draw"
-	"math"
 	"strconv"
 
 	"github.com/fogleman/gg"
@@ -95,20 +94,21 @@ func (b *Banner) Render() image.Image {
 
 	_, textHeight := c.MeasureString("A")
 
-	layout := nameListLayout{
+	layout := TableLayout{
 		Size: Size{
 			float64(width),
 			float64(height * 2 / 3),
 		},
 		CellSize: Size{
 			b.ServerStatus.PlayerList.GetNameWidth(c) + 30,
-			textHeight,
+			textHeight * 1.2,
 		},
 	}
 
 	playerCount := len(b.ServerStatus.PlayerList.Players)
 	row, column := layout.getLayout(playerCount)
 
+	c.Push()
 	p := 0
 	for col := 0; col < column; col++ {
 		x := layout.CellSize.Width * float64(col)
@@ -116,45 +116,17 @@ func (b *Banner) Render() image.Image {
 			if p >= playerCount {
 				break
 			}
-			// d.DrawString(b.ServerStatus.PlayerList.Players[p].Name)
-			c.DrawStringAnchored(b.ServerStatus.PlayerList.Players[p].Name, x, float64(r)*layout.CellSize.Height+(float64(height)/3), 0, 1)
+			c.Push()
+			y := float64(r)*layout.CellSize.Height + (float64(height) / 3)
+			c.SetRGBA255(11, 11, 11, 80)
+			c.DrawRectangle(x, y, layout.CellSize.Width, layout.CellSize.Height)
+			c.Fill()
+			c.Pop()
+
+			c.DrawStringAnchored(b.ServerStatus.PlayerList.Players[p].Name, x, y, 0, 1)
 			p++
 		}
 	}
 
 	return c.Image()
-}
-
-const (
-	horizontal = iota
-	vertical
-)
-
-type Size struct {
-	Width  float64
-	Height float64
-}
-
-type nameListLayout struct {
-	Size     Size
-	CellSize Size
-}
-
-func (n nameListLayout) getLayout(itemCount int) (int, int) {
-	if n.getOrientation() == vertical {
-		// vertical, try allocate more rows.
-		row := math.Floor(n.Size.Height / n.CellSize.Height)
-		column := math.Ceil(float64(itemCount) / row)
-		return int(row), int(column)
-	}
-	column := math.Floor(n.Size.Width / n.CellSize.Width)
-	row := math.Ceil(float64(itemCount) / column)
-	return int(row), int(column)
-}
-
-func (n nameListLayout) getOrientation() int {
-	if n.Size.Width > n.Size.Height {
-		return horizontal
-	}
-	return vertical
 }
