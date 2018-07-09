@@ -85,12 +85,15 @@ func (b *Banner) Render() image.Image {
 	bounds := b.Background.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-	c := gg.NewContextForImage(b.Background)
+	c := newDrawerForImage(b.Background)
 	c.DrawImage(b.Background, 0, 0)
 	c.SetRGB255(0, 0, 0)
 	c.SetFontFace(b.FontFace)
-	c.DrawStringAnchored(b.ServerStatus.GetAddress(), float64(0), float64(0), 0, 1)
-	c.DrawStringAnchored(b.ServerStatus.GetPlayerCount(), float64(width), float64(0), 1, 1)
+	c.Push()
+	c.Scale(1.4, 1.4)
+	c.DrawOutlinedTextAnchored(b.ServerStatus.GetAddress(), float64(0), float64(0), 0, 1)
+	c.Pop()
+	c.DrawOutlinedTextAnchored(b.ServerStatus.GetPlayerCount(), float64(width-8), float64(80), 1, 1)
 
 	_, textHeight := c.MeasureString("A")
 
@@ -108,7 +111,6 @@ func (b *Banner) Render() image.Image {
 	playerCount := len(b.ServerStatus.PlayerList.Players)
 	row, column := layout.getLayout(playerCount)
 
-	c.Push()
 	p := 0
 	for col := 0; col < column; col++ {
 		x := layout.CellSize.Width * float64(col)
@@ -123,10 +125,50 @@ func (b *Banner) Render() image.Image {
 			c.Fill()
 			c.Pop()
 
-			c.DrawStringAnchored(b.ServerStatus.PlayerList.Players[p].Name, x, y, 0, 1)
+			c.DrawOutlinedTextAnchored(b.ServerStatus.PlayerList.Players[p].Name, x, y, 0, 1)
 			p++
 		}
 	}
 
 	return c.Image()
+}
+
+type drawer struct {
+	*gg.Context
+}
+
+func (d *drawer) DrawOutlinedText(message string, x, y float64) {
+	d.Push()
+	d.SetRGB(0, 0, 0)
+	d.DrawString(message, x-1, y-1)
+	d.DrawString(message, x+1, y+1)
+	d.Pop()
+	d.Push()
+	d.SetRGB(1, 1, 1)
+	d.DrawString(message, x, y)
+	d.Pop()
+}
+
+func (d *drawer) DrawOutlinedTextAnchored(message string, x, y, ax, ay float64) {
+	d.Push()
+	d.SetRGB(0, 0, 0)
+	d.DrawStringAnchored(message, x-1, y-1, ax, ay)
+	d.DrawStringAnchored(message, x+1, y+1, ax, ay)
+	d.Pop()
+	d.Push()
+	d.SetRGB(1, 1, 1)
+	d.DrawStringAnchored(message, x, y, ax, ay)
+	d.Pop()
+}
+
+func newDrawer(width, height int) *drawer {
+	return &drawer{
+		gg.NewContext(width, height),
+	}
+}
+
+func newDrawerForImage(img image.Image) *drawer {
+	return &drawer{
+		gg.NewContextForImage(img),
+	}
 }

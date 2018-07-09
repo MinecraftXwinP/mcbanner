@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"strconv"
 
-	"golang.org/x/image/font/inconsolata"
-
+	"github.com/golang/freetype/truetype"
 	"github.com/google/uuid"
 
 	"github.com/andrewtian/minepong"
@@ -64,10 +64,21 @@ func main() {
 			Players: players,
 		},
 	}
+
 	var img image.Image
 	if len(backgroundPath) <= 0 {
 		img = mcbanner.GetDefault(status)
 	} else {
+		fontFile, err := os.Open("NotoSansDisplay-Regular.ttf")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer fontFile.Close()
+		data, err := ioutil.ReadAll(fontFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		f, err := truetype.Parse(data)
 		bkFile, err := os.Open(backgroundPath)
 		if err != nil {
 			log.Fatal(err)
@@ -75,8 +86,10 @@ func main() {
 		defer bkFile.Close()
 		b, err := png.Decode(bkFile)
 		r := mcbanner.Banner{
-			Background:   b,
-			FontFace:     inconsolata.Bold8x16,
+			Background: b,
+			FontFace: truetype.NewFace(f, &truetype.Options{
+				Size: 16,
+			}),
 			ServerStatus: status,
 		}
 		img = r.Render()
